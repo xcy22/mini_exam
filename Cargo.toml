@@ -1,0 +1,11 @@
+[package]
+name = "mini_exam"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+robot_behavior = "0.5.1"
+libjaka = "0.1.9"
+rsbullet = "0.3.1"
+roplat_rerun = "0.1.1"
+anyhow = "1.0.100"
