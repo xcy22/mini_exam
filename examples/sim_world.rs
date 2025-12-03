@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
 
     // TODO : change the path to your own
     physics_engine
-        .add_search_path("E:\\yixing\\code\\Robot-Exp\\drives\\asserts")?
+        .add_search_path("E:\\jaka\\mini_exam\\asserts")?
         .set_gravity([0., 0., -10.])?
         .set_step_time(Duration::from_secs_f64(1. / 240.))?;
 
