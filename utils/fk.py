@@ -55,7 +55,7 @@ if __name__ == "__main__":
     fk_solver = ForwardKinematicsSolver(jaka_dh)
     
     # 测试关节角 (全零)
-    test_joints = [59.285, 17.656, 104.646, -3.474, 63.511, -17.628]
+    test_joints = [-30.928, 27.715, 41.188, -85.189, 59.993, -140.573]
     # 注意：如果输入是角度，需要先转换为弧度
     test_joints = np.radians(test_joints) 
 
