@@ -20,13 +20,14 @@ JAKA_DH = [
 JAKA_JOINT_MIN = np.array([-2*np.pi, -2*np.pi/3, -2*np.pi/3, -2*np.pi, -2*np.pi/3, -2*np.pi])
 JAKA_JOINT_MAX = np.array([ 2*np.pi,  2*np.pi/3,  2*np.pi/3,  2*np.pi,  2*np.pi/3,  2*np.pi])
 
-def get_ik_solution(ik_solver, mode, value, ref_joints=None):
+def get_ik_solution(ik_solver, mode, value, ref_joints=None, T_base=None):
     """
     辅助函数：解析输入并获取关节角 (弧度)
     :param mode: 'joint' (角度制) 或 'pose' (位置+旋转矩阵)
     :param value: 对应的数值
     :param ik_solver: IK求解器实例
     :param ref_joints: 参考关节角(弧度)，用于IK选解
+    :param T_base: 基座变换矩阵 (4x4)，如果提供，则认为输入的 pose 是绝对坐标，需转换为局部坐标
     """
     if mode == 'joint':
         # 输入为角度，转换为弧度
@@ -34,6 +35,26 @@ def get_ik_solution(ik_solver, mode, value, ref_joints=None):
     elif mode == 'pose':
         # 输入为位姿 (pos, rot)
         pos, rot = value
+        
+        # 转换为 numpy 数组，防止列表索引错误 (list indices must be integers...)
+        pos = np.array(pos)
+        rot = np.array(rot)
+
+        # 如果提供了基座变换矩阵，说明输入是绝对坐标，需要转换为局部坐标
+        if T_base is not None:
+            # 构造绝对位姿矩阵 T_abs
+            T_abs = np.eye(4)
+            T_abs[:3, :3] = rot
+            T_abs[:3, 3] = pos
+            
+            # 计算局部位姿矩阵 T_local = inv(T_base) * T_abs
+            T_base_inv = np.linalg.inv(T_base)
+            T_local = np.dot(T_base_inv, T_abs)
+            
+            # 提取局部位置和旋转
+            pos = T_local[:3, 3]
+            rot = T_local[:3, :3]
+
         # 如果没有参考关节角，使用零位
         if ref_joints is None:
             ref_joints = np.zeros(6)
@@ -89,14 +110,16 @@ def generate_dual_arm_trajectory(master_waypoints, slave_waypoints, duration_seg
     try:
         print("计算主臂关键点逆解...")
         for i, wp in enumerate(master_waypoints):
-            q = get_ik_solution(ik_solver, wp[0], wp[1], ref_joints=q_ref_m)
+            # 传入 Tbase_master，支持绝对坐标 pose
+            q = get_ik_solution(ik_solver, wp[0], wp[1], ref_joints=q_ref_m, T_base=Tbase_master)
             master_qs.append(q)
             q_ref_m = q # 更新参考点为当前点，防止突变
             print(f"  主臂点 {i}: {np.round(q, 3)}")
 
         print("计算从臂关键点逆解...")
         for i, wp in enumerate(slave_waypoints):
-            q = get_ik_solution(ik_solver, wp[0], wp[1], ref_joints=q_ref_s)
+            # 传入 Tbase_slave，支持绝对坐标 pose
+            q = get_ik_solution(ik_solver, wp[0], wp[1], ref_joints=q_ref_s, T_base=Tbase_slave)
             slave_qs.append(q)
             q_ref_s = q
             print(f"  从臂点 {i}: {np.round(q, 3)}")
@@ -192,8 +215,12 @@ if __name__ == "__main__":
     master_wps = [
         ('joint', [0.000, 0.000, 0.000, 0.000, 0.000, 0.000]), # Start
         ('joint', [-46.100, -10.193, 97.777, -4.253, 68.200, -37.112]), # Mid
-        ('joint', [-60.572, 13.115, 113.291, 2.180, 48.550, -57.954]),  # Pick
-        ('joint', [-31.551, 29.221, 31.079, -78.389, 59.712, -57.965])  # End
+        ('pose', ([0.125, 0.0, 0.105], 
+                  [[1.0,  0.0, 0.0],
+                   [0.0, -1.0, 0.0],
+                   [0.0,  0.0, -1.0]])),  # Pick (位置+旋转矩阵)
+        # ('joint', [-60.572, 13.115, 113.291, 2.180, 48.550, -57.954]),  # Pick
+        # ('joint', [-31.551, 29.221, 31.079, -78.389, 59.712, -57.965])  # End
         # 可以继续添加更多点...
     ]
     
@@ -201,8 +228,12 @@ if __name__ == "__main__":
     slave_wps = [
         ('joint', [0.000, 0.000, 0.000, 0.000, 0.000, 0.000]), # Start
         ('joint', [60.903, -23.849, 96.589, 1.014, 89.364, -11.038]),   # Mid
-        ('joint', [59.285, 17.656, 104.646, -3.474, 63.511, -17.628]),  # Pick
-        ('joint', [31.659, 27.489, 96.695, -74.691, -65.946, -17.627])  # End
+        ('pose', ([-0.125, 0.0, 0.105], 
+                  [[ 0.0, -1.0, 0.0],
+                   [-1.0,  0.0, 0.0],
+                   [ 0.0,  0.0, -1.0]])),  # Pick (位置+旋转矩阵)
+        # ('joint', [59.285, 17.656, 104.646, -3.474, 63.511, -17.628]),  # Pick
+        # ('joint', [31.659, 27.489, 96.695, -74.691, -65.946, -17.627])  # End
         # 数量必须与主臂一致
     ]
 
