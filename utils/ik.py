@@ -2,19 +2,21 @@ import numpy as np
 import math
 
 class InverseKinematicsSolver:
-    def __init__(self, dh_params, max_iter=100, tol=1e-4, learning_rate=1.0):
+    def __init__(self, dh_params, max_iter=500, tol=1e-4, learning_rate=1.0, joint_limits=None):
         """
         初始化 IK 求解器
         :param dh_params: DH 参数列表，格式为 [[a, alpha, d, theta_offset], ...]
         :param max_iter: 最大迭代次数
         :param tol: 收敛阈值 (位置和姿态误差)
         :param learning_rate: 学习率 (步长)
+        :param joint_limits: 关节限制元组 (min_limits, max_limits)，均为 numpy 数组
         """
         self.dh_params = dh_params
         self.num_joints = len(dh_params)
         self.max_iter = max_iter
         self.tol = tol
         self.lr = learning_rate
+        self.joint_limits = joint_limits
 
     def _dh_transform(self, a, alpha, d, theta):
         """计算单个关节的变换矩阵 (标准 DH)"""
@@ -100,7 +102,7 @@ class InverseKinematicsSolver:
         :param target_pos: 目标位置 [x, y, z]
         :param target_rot: 目标旋转矩阵 (3x3)
         :param initial_joints: 初始关节角度猜测 (可选)
-        :return: (success, joint_angles)
+        :return: (success, joint_angles, error_norm)
         """
         if initial_joints is None:
             q = np.zeros(self.num_joints)
@@ -117,12 +119,15 @@ class InverseKinematicsSolver:
             pos_err = target_pos - curr_pos
             rot_err = self._rotation_error(target_rot, curr_rot)
             error = np.concatenate((pos_err, rot_err))
+            error_norm = np.linalg.norm(error)
             
             # 3. 检查是否收敛
-            if np.linalg.norm(error) < self.tol:
-                # 将角度归一化到 [-pi, pi]
-                q = (q + np.pi) % (2 * np.pi) - np.pi
-                return True, q
+            if error_norm < self.tol:
+                # 如果没有设置关节限制，则归一化到 [-pi, pi]
+                # 如果设置了限制，则保持原值（因为已经在限制范围内）
+                if self.joint_limits is None:
+                    q = (q + np.pi) % (2 * np.pi) - np.pi
+                return True, q, error_norm
             
             # 4. 计算雅可比矩阵
             J = self._compute_jacobian(transforms, curr_pos)
@@ -136,7 +141,16 @@ class InverseKinematicsSolver:
             delta_q = np.dot(J_pinv, error)
             q += self.lr * delta_q
             
-        return False, q
+            # 7. 应用关节限制
+            if self.joint_limits is not None:
+                q = np.clip(q, self.joint_limits[0], self.joint_limits[1])
+            
+        # 计算最终误差
+        curr_pos, curr_rot, _ = self.forward_kinematics(q)
+        pos_err = target_pos - curr_pos
+        rot_err = self._rotation_error(target_rot, curr_rot)
+        error = np.concatenate((pos_err, rot_err))
+        return False, q, np.linalg.norm(error)
 
 # --- 测试代码 ---
 if __name__ == "__main__":
@@ -144,26 +158,31 @@ if __name__ == "__main__":
     # 注意：这里需要填入真实的 DH 参数才能准确工作
     # 格式: [a, alpha, d, offset]
     jaka_dh = [
-        [0,       np.pi/2,  0.120, 0],
-        [-0.425,  0,        0,     0],
-        [-0.395,  0,        0,     0],
-        [0,       np.pi/2,  0.090, 0],
-        [0,      -np.pi/2,  0.095, 0],
-        [0,       0,        0.070, 0]
+        [0,       np.pi/2,  0.187, 0],
+        [0.210,   0,        0,     np.pi/2],
+        [0,  np.pi/2,        0,     np.pi/2],
+        [0,       np.pi/2,  0.2105, np.pi],
+        [0,      np.pi/2,  0.006, np.pi],
+        [0,       0,        0.1593, 0]
     ]
 
     ik_solver = InverseKinematicsSolver(jaka_dh)
 
     # 设定一个目标 (假设这是某个已知点的位姿)
-    target_position = [0.4, 0.1, 0.3]
-    target_rotation = np.eye(3) # 单位阵，即无旋转
+    target_position = [-0.3698, -0.006, 0.397]
+    target_rotation = np.array([
+        [0, 0, -1],
+        [ 0, -1, 0],
+        [ -1, 0, 0]
+    ])
 
     print(f"Target Pos: {target_position}")
     
-    success, joints = ik_solver.solve(target_position, target_rotation)
+    success, joints, err = ik_solver.solve(target_position, target_rotation)
     
     if success:
         print("IK Solved Successfully!")
+        print(f"Error: {err}")
         print("Joint Angles (rad):", np.round(joints, 4))
         
         # 验证结果

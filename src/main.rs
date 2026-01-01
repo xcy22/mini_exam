@@ -1,5 +1,3 @@
-use std::f64::consts::FRAC_PI_2;
-
 use libjaka::JakaMini2;
 use robot_behavior::behavior::*;
 use roplat_rerun::RerunHost;
@@ -21,7 +19,7 @@ fn main() -> anyhow::Result<()> {
 
     robot_render.attach_from(&mut robot)?;
 
-    robot.move_joint(&[FRAC_PI_2; _])?;
+    robot.move_traj_from_file("output_traj_zero.json")?;
 
     loop {
         physics.step()?;

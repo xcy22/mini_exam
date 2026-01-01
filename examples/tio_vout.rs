@@ -22,7 +22,8 @@ mod tests {
     #[test]
     fn enable_vout_12v() -> anyhow::Result<()> {
         let mut robot = JakaMini2::new("10.5.5.100");
-        robot.set_tio_vout(TioVout::Enable(TioVoutMode::V12V))?;
+        robot.set_tio_vout(TioVout::Disable)?;
+        // robot.set_tio_vout(TioVout::Enable(TioVoutMode::V12V))?
         Ok(())
     }
 }
