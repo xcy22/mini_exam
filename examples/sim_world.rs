@@ -77,12 +77,12 @@ fn main() -> anyhow::Result<()> {
     // robot_1.move_traj_from_file("output_traj_zero.json")?;
     // robot_2.move_traj_from_file("robot_2_traj.json")?;
 
-    let file = File::open("master_trajectory_full.json")?;
+    let file = File::open("master_trajectory_place.json")?;
     let reader = BufReader::new(file);
     let path: Vec<MotionType<6>> = serde_json::from_reader(reader).unwrap();
     robot_2.move_traj_async(path)?;
 
-    let file_2 = File::open("slave_trajectory_full.json")?;
+    let file_2 = File::open("slave_trajectory_place.json")?;
     let reader_2 = BufReader::new(file_2);
     let path: Vec<MotionType<6>> = serde_json::from_reader(reader_2).unwrap();
     robot_1.move_traj_async(path)?;

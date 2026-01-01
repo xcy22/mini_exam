@@ -4,6 +4,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 use libjaka::JakaMini2;
+use libjaka::types::{TioVout, TioVoutMode};
 use robot_behavior::MotionType;
 use robot_behavior::behavior::*;
 
@@ -18,10 +19,12 @@ fn main() -> anyhow::Result<()> {
     robot_r.enable()?;
     robot_l.init()?;
     robot_l.enable()?;
+    robot_l.set_tio_vout(TioVout::Disable)?;
+    robot_r.set_tio_vout(TioVout::Disable)?;
 
     // 此时你才可以发送运动指令
-    robot_r.move_to_async(MotionType::Joint([0.; 6]))?;
-    robot_l.move_to_async(MotionType::Joint([0.; 6]))?;
+    robot_r.move_to(MotionType::Joint([0.; 6]))?;
+    robot_l.move_to(MotionType::Joint([0.; 6]))?;
     // robot_l.move_joint(&[0.; 6]);
     // println!("{ans1:?}");
     // println!("{ans2:?}");
@@ -30,19 +33,42 @@ fn main() -> anyhow::Result<()> {
     robot_l.waiting_for_finish()?;
     robot_r.waiting_for_finish()?;
 
-    let file = File::open("slave_trajectory_full.json")?;
+    let file = File::open("slave_trajectory_pick.json")?;
     let reader = BufReader::new(file);
     let path: Vec<MotionType<6>> = serde_json::from_reader(reader).unwrap();
     robot_l.move_traj_async(path)?;
 
-    let file_2 = File::open("master_trajectory_full.json")?;
+    let file_2 = File::open("master_trajectory_pick.json")?;
     let reader_2 = BufReader::new(file_2);
     let path: Vec<MotionType<6>> = serde_json::from_reader(reader_2).unwrap();
     robot_r.move_traj_async(path)?;
 
     // robot_l.waiting_for_finish()?;
     // robot_r.waiting_for_finish()?;
-    sleep(Duration::from_secs(50));
+    sleep(Duration::from_secs(12));
+    robot_l.is_moving()?;
+    robot_r.is_moving()?;
+
+    robot_l.set_tio_vout(TioVout::Enable(TioVoutMode::V12V))?;
+    robot_r.set_tio_vout(TioVout::Enable(TioVoutMode::V12V))?;
+
+    print!("开始放置动作\n");
+
+    let file_3 = File::open("slave_trajectory_place.json")?;
+    let reader_3 = BufReader::new(file_3);
+    let path: Vec<MotionType<6>> = serde_json::from_reader(reader_3).unwrap();
+    robot_l.move_traj_async(path)?;
+
+    let file_4 = File::open("master_trajectory_place.json")?;
+    let reader_4 = BufReader::new(file_4);
+    let path: Vec<MotionType<6>> = serde_json::from_reader(reader_4).unwrap();
+    robot_r.move_traj_async(path)?;
+
+    sleep(Duration::from_secs(15));
+
+    robot_l.set_tio_vout(TioVout::Disable)?;
+    robot_r.set_tio_vout(TioVout::Disable)?;
+
     // robot.disable()?;
     // 完全等同于内置函数 robot._power_off()?;
     // robot.shutdown()?;
