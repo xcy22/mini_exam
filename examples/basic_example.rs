@@ -64,12 +64,15 @@ fn main() -> anyhow::Result<()> {
     let path: Vec<MotionType<6>> = serde_json::from_reader(reader_4).unwrap();
     robot_r.move_traj_async(path)?;
 
-    sleep(Duration::from_secs(14));
+    sleep(Duration::from_secs(13));
 
     robot_l.set_tio_vout(TioVout::Disable)?;
+
+    sleep(Duration::from_secs(6));
+
     robot_r.set_tio_vout(TioVout::Disable)?;
 
-    sleep(Duration::from_secs(10));
+    sleep(Duration::from_secs(5));
 
     // robot.disable()?;
     // 完全等同于内置函数 robot._power_off()?;
